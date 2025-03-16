@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mason Finder</title>
+    <style>
+        :root {
+            --primary-color: #3a6ea5;
+            --secondary-color: #ff6b35;
+            --background-color: #f9f9f9;
+            --card-background: #ffffff;
+            --text-color: #333333;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        .search-box {
+            display: flex;
+            flex-direction: column;
+            background-color: var(--card-background);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .search-box input, .search-box select {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+            min-width: 150px;
+        }
+        .search-box button {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        .search-box button:hover {
+            background-color: #e55a2b;
+        }
+        .mason-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        .mason-card {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+        }
+        .mason-card:hover {
+            transform: translateY(-5px);
+        }
+        .mason-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        .mason-info {
+            padding: 1.5rem;
+        }
+        .mason-name {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin: 0 0 0.5rem 0;
+        }
+        .mason-detail {
+            display: flex;
+            margin-bottom: 0.5rem;
+        }
+        .detail-label {
+            font-weight: bold;
+            width: 100px;
+        }
+        .contact-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 1rem;
+            transition: background-color 0.3s;
+        }
+        .contact-button:hover {
+            background-color: #2a5a8f;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: var(--card-background);
+            margin: 15% auto;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            position: relative;
+        }
+        .close {
+            position: absolute;
+            right: 1.5rem;
+            top: 1rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .no-results {
+            text-align: center;
+            font-size: 1.25rem;
+            padding: 2rem;
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        @media (max-width: 768px) {
+            .mason-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Mason Finder</h1>
+        <p>Find skilled masons in your area</p>
+    </header>
+    <div class="container">
+        <div class="search-box">
+            <h2>Search for Masons</h2>
+            <div class="search-row">
+                <input type="text" id="nameSearch" placeholder="Search by name">
+                <select id="locationFilter">
+                    <option value="">All Locations</option>
+                </select>
+                <input type="number" id="experienceFilter" placeholder="Min. Experience (years)">
+            </div>
+            <button id="searchButton">Search</button>
+        </div>
+        <div id="masonsList" class="mason-grid">
+            <!-- Mason cards will be added here -->
+        </div>
+    </div>
+    <!-- Contact Modal -->
+    <div id="contactModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Contact Mason</h2>
+            <div id="contactInfo"></div>
+        </div>
+    </div>
+    <script>
+        let masons = [];
+
+        async function fetchMasons() {
+    try {
+        console.log("Attempting to fetch MLR.csv...");
+        // Use a relative path since the CSV is in the same folder as index.html
+        const response = await fetch("MLR.csv");
+        console.log("Fetch response:", response);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        // Parse the CSV data
+        const text = await response.text();
+        console.log("CSV content:", text.substring(0, 200) + "..."); // Log first 200 chars
+        
+        if (!text.trim()) {
+            throw new Error("CSV file is empty");
+        }
+        
+        const rows = text.split("\n").slice(2); // Skip header row
+        if (rows.length === 0) {
+            throw new Error("No data rows found in CSV");
+        }
+        
+        masons = rows.map((row, index) => {
+            const [name, age, phone, location, experience, photo] = row.split(",");
+            if (!name || !age || !location) {
+                console.warn(`Invalid data in row ${index + 2}:`, row);
+            }
+            return {
+                name: name?.trim() || "Unknown",
+                age: parseInt(age) || 0,
+                phone: phone?.trim() || "N/A",
+                location: location?.trim() || "Unknown",
+                experience: parseInt(experience) || 0,
+                photo: photo?.trim() || "https://via.placeholder.com/300x200" // Using a public placeholder service
+            };
+        });
+        
+        console.log("Processed mason data:", masons);
+        
+        // Populate location filter
+        const locations = [...new Set(masons.map(mason => mason.location))].filter(Boolean);
+        const locationFilter = document.getElementById('locationFilter');
+        locations.forEach(location => {
+            const option = document.createElement('option');
+            option.value = location;
+            option.textContent = location;
+            locationFilter.appendChild(option);
+        });
+        
+        // Initial display of masons
+        displayMasons(masons);
+    } catch (error) {
+        console.error("Detailed error fetching mason data:", error);
+        document.getElementById('masonsList').innerHTML =
+            `<div class="no-results">
+                Failed to load mason data: ${error.message}<br>
+                Please ensure MLR.csv exists in the correct location and try again.
+            </div>`;
+    }
+}
+
+        function displayMasons(masonsToDisplay) {
+            const masonsList = document.getElementById('masonsList');
+            masonsList.innerHTML = '';
+            if (masonsToDisplay.length === 0) {
+                masonsList.innerHTML = '<div class="no-results">No masons found matching your criteria</div>';
+                return;
+            }
+            masonsToDisplay.forEach((mason, index) => {
+                const masonCard = document.createElement('div');
+                masonCard.className = 'mason-card';
+                masonCard.innerHTML = `
+                    <img src="${mason.photo}" alt="${mason.name}" class="mason-image">
+                    <div class="mason-info">
+                        <h3 class="mason-name">${mason.name}</h3>
+                        <div class="mason-detail">
+                            <span class="detail-label">Age:</span>
+                            <span>${mason.age}</span>
+                        </div>
+                        <div class="mason-detail">
+                            <span class="detail-label">Location:</span>
+                            <span>${mason.location}</span>
+                        </div>
+                        <div class="mason-detail">
+                            <span class="detail-label">Experience:</span>
+                            <span>${mason.experience} years</span>
+                        </div>
+                        <button class="contact-button" data-index="${index}">Contact</button>
+                    </div>
+                `;
+                masonsList.appendChild(masonCard);
+            });
+
+            // Add event listeners to contact buttons
+            document.querySelectorAll('.contact-button').forEach(button => {
+                button.addEventListener('click', function () {
+                    const index = this.getAttribute('data-index');
+                    showContactInfo(masonsToDisplay[index]);
+                });
+            });
+        }
+
+        function showContactInfo(mason) {
+            const modal = document.getElementById('contactModal');
+            const contactInfo = document.getElementById('contactInfo');
+            contactInfo.innerHTML = `
+                <div class="mason-detail">
+                    <span class="detail-label">Name:</span>
+                    <span>${mason.name}</span>
+                </div>
+                <div class="mason-detail">
+                    <span class="detail-label">Phone:</span>
+                    <span>${mason.phone}</span>
+                </div>
+                <div class="mason-detail">
+                    <span class="detail-label">Location:</span>
+                    <span>${mason.location}</span>
+                </div>
+                <div class="mason-detail">
+                    <span class="detail-label">Experience:</span>
+                    <span>${mason.experience} years</span>
+                </div>
+            `;
+            modal.style.display = 'block';
+        }
+
+        function searchMasons() {
+            const nameSearch = document.getElementById('nameSearch').value.toLowerCase();
+            const locationFilter = document.getElementById('locationFilter').value;
+            const experienceFilter = parseInt(document.getElementById('experienceFilter').value) || 0;
+            const filteredMasons = masons.filter(mason => {
+                const nameMatch = mason.name.toLowerCase().includes(nameSearch);
+                const locationMatch = locationFilter === '' || mason.location === locationFilter;
+                const experienceMatch = mason.experience >= experienceFilter;
+                return nameMatch && locationMatch && experienceMatch;
+            });
+            displayMasons(filteredMasons);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            fetchMasons();
+            document.getElementById('searchButton').addEventListener('click', searchMasons);
+            document.querySelector('.close').addEventListener('click', function () {
+                document.getElementById('contactModal').style.display = 'none';
+            });
+            window.addEventListener('click', function (event) {
+                if (event.target === document.getElementById('contactModal')) {
+                    document.getElementById('contactModal').style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
