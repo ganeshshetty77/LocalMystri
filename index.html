@@ -194,10 +194,8 @@
         async function fetchMasons() {
     try {
         console.log("Attempting to fetch MLR.csv...");
-        // Use a relative path since the CSV is in the same folder as index.html
         const response = await fetch("MLR.csv");
         console.log("Fetch response:", response);
-        
         if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
@@ -210,25 +208,38 @@
             throw new Error("CSV file is empty");
         }
         
-        const rows = text.split("\n").slice(2); // Skip header row
-        if (rows.length === 0) {
-            throw new Error("No data rows found in CSV");
+        // Split into rows and process
+        const rows = text.split("\n");
+        if (rows.length <= 2) { // Accounting for header and potentially empty rows
+            throw new Error("Not enough data rows found in CSV");
         }
         
-        masons = rows.map((row, index) => {
-            const [name, age, phone, location, experience, photo] = row.split(",");
-            if (!name || !age || !location) {
-                console.warn(`Invalid data in row ${index + 2}:`, row);
+        // Skip header row(s) and process data starting from row 2
+        masons = [];
+        for (let i = 2; i < rows.length; i++) {
+            const rowData = rows[i].split(",");
+            // Adjust indices based on your CSV structure (B-F columns)
+            // If A is index 0, then B is index 1, C is index 2, etc.
+            if (rowData.length >= 6) { // Make sure we have enough columns
+                const name = rowData[1]?.trim() || "Unknown"; // B column (index 1)
+                const age = parseInt(rowData[2]) || 0;        // C column (index 2)
+                const phone = rowData[3]?.trim() || "N/A";    // D column (index 3)
+                const location = rowData[4]?.trim() || "Unknown"; // E column (index 4)
+                const experience = parseInt(rowData[5]) || 0; // F column (index 5)
+                const photo = rowData[6]?.trim() || "https://via.placeholder.com/300x200"; // G column if exists
+                
+                masons.push({
+                    name,
+                    age,
+                    phone,
+                    location,
+                    experience,
+                    photo
+                });
+            } else {
+                console.warn(`Skipping row ${i + 1}: Insufficient columns`);
             }
-            return {
-                name: name?.trim() || "Unknown",
-                age: parseInt(age) || 0,
-                phone: phone?.trim() || "N/A",
-                location: location?.trim() || "Unknown",
-                experience: parseInt(experience) || 0,
-                photo: photo?.trim() || "https://via.placeholder.com/300x200" // Using a public placeholder service
-            };
-        });
+        }
         
         console.log("Processed mason data:", masons);
         
@@ -254,46 +265,63 @@
     }
 }
 
-        function displayMasons(masonsToDisplay) {
-            const masonsList = document.getElementById('masonsList');
-            masonsList.innerHTML = '';
-            if (masonsToDisplay.length === 0) {
-                masonsList.innerHTML = '<div class="no-results">No masons found matching your criteria</div>';
-                return;
-            }
-            masonsToDisplay.forEach((mason, index) => {
-                const masonCard = document.createElement('div');
-                masonCard.className = 'mason-card';
-                masonCard.innerHTML = `
-                    <img src="${mason.photo}" alt="${mason.name}" class="mason-image">
-                    <div class="mason-info">
-                        <h3 class="mason-name">${mason.name}</h3>
-                        <div class="mason-detail">
-                            <span class="detail-label">Age:</span>
-                            <span>${mason.age}</span>
-                        </div>
-                        <div class="mason-detail">
-                            <span class="detail-label">Location:</span>
-                            <span>${mason.location}</span>
-                        </div>
-                        <div class="mason-detail">
-                            <span class="detail-label">Experience:</span>
-                            <span>${mason.experience} years</span>
-                        </div>
-                        <button class="contact-button" data-index="${index}">Contact</button>
-                    </div>
-                `;
-                masonsList.appendChild(masonCard);
-            });
-
-            // Add event listeners to contact buttons
-            document.querySelectorAll('.contact-button').forEach(button => {
-                button.addEventListener('click', function () {
-                    const index = this.getAttribute('data-index');
-                    showContactInfo(masonsToDisplay[index]);
-                });
-            });
+function displayMasons(masonsToDisplay) {
+    const masonsList = document.getElementById('masonsList');
+    masonsList.innerHTML = '';
+    
+    if (!masonsToDisplay || masonsToDisplay.length === 0) {
+        masonsList.innerHTML = '<div class="no-results">No masons found matching your criteria</div>';
+        return;
+    }
+    
+    masonsToDisplay.forEach((mason, index) => {
+        // Create card element
+        const masonCard = document.createElement('div');
+        masonCard.className = 'mason-card';
+        
+        // Handle potential missing image URL
+        const photoUrl = mason.photo && mason.photo !== "undefined" 
+            ? mason.photo 
+            : "https://via.placeholder.com/300x200";
+        
+        // Build card content with proper error handling
+        masonCard.innerHTML = `
+            <div class="mason-image-container">
+                <img src="${photoUrl}" alt="${mason.name}" 
+                     class="mason-image" 
+                     onerror="this.src='https://via.placeholder.com/300x200'; this.onerror='';">
+            </div>
+            <div class="mason-info">
+                <h3 class="mason-name">${mason.name || 'Unknown'}</h3>
+                <div class="mason-detail">
+                    <span class="detail-label">Age:</span>
+                    <span>${mason.age || 'N/A'}</span>
+                </div>
+                <div class="mason-detail">
+                    <span class="detail-label">Location:</span>
+                    <span>${mason.location || 'Unknown'}</span>
+                </div>
+                <div class="mason-detail">
+                    <span class="detail-label">Experience:</span>
+                    <span>${mason.experience || 0} years</span>
+                </div>
+                <button class="contact-button" data-index="${index}">Contact</button>
+            </div>
+        `;
+        
+        masonsList.appendChild(masonCard);
+    });
+    
+    // Add event listeners to contact buttons - using delegation for better performance
+    masonsList.addEventListener('click', function(event) {
+        if (event.target.classList.contains('contact-button')) {
+            const index = event.target.getAttribute('data-index');
+            showContactInfo(masonsToDisplay[index]);
         }
+    });
+    
+    console.log(`Displayed ${masonsToDisplay.length} masons`);
+}
 
         function showContactInfo(mason) {
             const modal = document.getElementById('contactModal');
